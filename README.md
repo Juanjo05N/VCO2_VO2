@@ -43,7 +43,7 @@ Para ejecutar el análisis, usa:
 ```bash
 python main.py
 ```
-El sistema pedirá el número del paciente y el número total de conjuntos de datos (sets) a procesar.
+El sistema pedirá el número del paciente y el número total de conjuntos de datos (sets) a procesar. Se debe tener una carpeta "Paciente_i" en el mismo lugar que esté el codigo y allí adentro debe estar el fast decoded y el spo2 decoded
 
 ---
 
