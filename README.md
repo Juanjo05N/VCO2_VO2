@@ -5,11 +5,11 @@ Este repositorio contiene un conjunto de scripts en Python para procesar y anali
 ---
 
 ## 🚀 Características Principales
-✅ **Carga y procesamiento de datos** desde archivos Excel.  
-✅ **Cálculo de métricas respiratorias** como frecuencia, presión, volumen y sincronización de fases.  
-✅ **Corrección de fugas y análisis de tendencias.**  
-✅ **Generación de gráficos** para visualización de datos.  
-✅ **Exportación de resultados** en archivos Excel con la información procesada.  
+✅ Procesamiento de datos crudos para identificación de ciclos y fases respiratorias.
+✅ Sincronización y ajuste de datos con retrasos en sensores.
+✅ Generación de gráficos para visualización de datos.
+✅ Cálculo de variables relevantes como volumen, presión, flujo y otros.
+✅ Almacenamiento de resultados en archivos Excel.
 
 ---
 
@@ -24,37 +24,33 @@ Este repositorio contiene un conjunto de scripts en Python para procesar y anali
 
 ---
 
-## 🛠️ Instalación y Uso
-### 🔹 Requisitos Previos
-Antes de ejecutar el código, asegúrate de tener instalado:
-- Python 3.8+
-- Pandas
-- NumPy
-- Matplotlib
-- OpenPyXL
+## Requisitos
+Este proyecto requiere Python 3 y las siguientes librerías:
+- `pandas`
+- `numpy`
+- `matplotlib`
+- `scipy`
+- `tkinter`
+- `openpyxl`
 
-Instala las dependencias con:
+Puedes instalarlas con:
 ```bash
-pip install -r requirements.txt
+pip install pandas numpy matplotlib scipy openpyxl
 ```
 
-### 🔹 Ejecución del Programa
-Para ejecutar el análisis, usa:
+## Uso
+1. Coloca los archivos de datos en la misma carpeta que el script.
+2. Ejecuta el script:
 ```bash
-python main.py
+python Final_Code.py
 ```
-El sistema pedirá el número del paciente y el número total de conjuntos de datos (sets) a procesar. Se debe tener una carpeta "Paciente_i" en el mismo lugar que esté el codigo y allí adentro debe estar el fast decoded y el spo2 decoded
+3. Sigue las instrucciones en la terminal para seleccionar el proceso deseado.
 
----
-
-## 📊 Flujo de Trabajo
-1️⃣ **Importación de Datos:** Se cargan archivos Excel con registros de ciclos respiratorios.  
-2️⃣ **Procesamiento:** Se ejecutan cálculos de métricas como presiones, volúmenes y tiempos.  
-3️⃣ **Corrección de Fugas:** Se aplican correcciones a las mediciones de O₂ y CO₂.  
-4️⃣ **Análisis Final:** Se generan estadísticas y gráficos para su interpretación.  
-5️⃣ **Exportación:** Los resultados finales se guardan en archivos Excel en la carpeta `Subsets_Procesados_Finales_Paciente_{num_paciente}`.
-
----
+## Estructura del Código
+- **Procesamiento inicial**: Limpieza y estructuración de los datos.
+- **Sincronización y ajuste**: Aplicación de retrasos y correcciones.
+- **Cálculo de variables**: Determinación de métricas respiratorias.
+- **Generación de reportes**: Almacenamiento de los resultados en Excel.
 
 ## 📝 Notas y Mejoras Futuras
 🔹 Agregar más validaciones para evitar errores con archivos faltantes.  
@@ -64,7 +60,7 @@ El sistema pedirá el número del paciente y el número total de conjuntos de da
 ---
 
 ## 🤝 Contribuciones
-Si deseas contribuir, abre un issue o envía un pull request con mejoras.
+Si deseas contribuir, siéntete libre de hacer un fork y enviar un pull request con mejoras o correcciones.
 
 ---
 
