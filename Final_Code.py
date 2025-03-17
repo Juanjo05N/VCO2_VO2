@@ -522,26 +522,6 @@ def VO2_CO2_Real(df):
     
     df = df[column_order]
     return df
-'''
-def VO2_Y(df):
-    df = df.copy()
-    # Crear la columna flujo_o2 que es flujo * (o2/100) pero como el flujo esta en l/min y se necesita en ml/ms, se hace la conversión
-    df['flujo_o2'] = df['flujo']*((1000/1)*(1/60)*(1/1000)) * (df['o2'] / 100)
-    df['VO2_ciclo (ml) ALT2'] = np.nan
-    ciclos_unicos = df['ciclo'].unique()
-    for ciclo in ciclos_unicos:
-        datos_ciclo = df[df['ciclo'] == ciclo]
-        if len(datos_ciclo) > 0:
-            x = datos_ciclo['t'].values
-            y = datos_ciclo['flujo_o2'].values
-            vo2_ciclo = integrate.trapezoid(y, x)
-            primer_indice_ciclo = datos_ciclo.index[0]
-            df.at[primer_indice_ciclo, 'VO2_ciclo (ml) ALT2'] = vo2_ciclo
-        else:
-            print(f"Advertencia: El ciclo {ciclo} no tiene datos asociados.")
-
-    return df
-'''
 def VO2_Y(df):
     df = df.copy()
     df['flujo_o2'] = df['flujo'] * ((1000/1)*(1/60)*(1/1000)) * (df['o2'] / 100)
@@ -593,25 +573,6 @@ def VO2_Y(df):
             print(f"Advertencia: El ciclo {ciclo} no tiene datos asociados.")
     
     return df
-'''
-def VCO2_Y(df):
-    df = df.copy()
-    # Crear la columna flujo_o2 que es flujo * (o2/100) pero como el flujo esta en l/min y se necesita en ml/ms, se hace la conversión
-    df['flujo_co2'] = df['flujo']*((1000/1)*(1/60)*(1/1000)) * (df['co2'] / 100)
-    df['VCO2_ciclo (ml) ALT2'] = np.nan
-    ciclos_unicos = df['ciclo'].unique()
-    for ciclo in ciclos_unicos:
-        datos_ciclo = df[df['ciclo'] == ciclo]
-        if len(datos_ciclo) > 0:
-            x = datos_ciclo['t'].values
-            y = datos_ciclo['flujo_co2'].values
-            vco2_ciclo = integrate.trapezoid(y, x)
-            primer_indice_ciclo = datos_ciclo.index[0]
-            df.at[primer_indice_ciclo, 'VCO2_ciclo (ml) ALT2'] = vco2_ciclo #REVISAR ESTO!!!!
-        else:
-            print(f"Advertencia: El ciclo {ciclo} no tiene datos asociados.")
-    return df
-'''
 def VCO2_Y(df):
     df = df.copy()
     df['flujo_co2'] = df['flujo'] * ((1000/1)*(1/60)*(1/1000)) * (df['co2'] / 100)
@@ -810,32 +771,45 @@ def vol_fuga(df,ciclos_unicos,df_copy): #P6
     df["Vol_fuga (ml)"] = vol_fuga
     print("P6 completado")
     return df
-def compliance_res_I_VM(df): #P7
+def compliance_res_I_VM(df):  # P7
     compliance = []
     res_I = []
     vm = []
-    # Recorrer cada ciclo único y calcular los valores requeridos
+
     for index, row in df.iterrows():
         # Compliance (ml/cmH2O)
-        if row["Pres_Plato (cmH2O)"] is not None and row["Pres_media_E (cmH2O)"] is not None:
-            delta_presion = row["Pres_Plato (cmH2O)"] - row["Pres_media_E (cmH2O)"]
-            compliance_value = round(row["Vol_max_I_P (ml)"] / delta_presion, 1) if delta_presion > 0 else None
+        pres_plato = row["Pres_Plato (cmH2O)"]
+        pres_media_E = row["Pres_media_E (cmH2O)"]
+        vol_max_I_P = row["Vol_max_I_P (ml)"]
+
+        if pres_plato is not None and pres_media_E is not None and vol_max_I_P is not None:
+            delta_presion = pres_plato - pres_media_E
+            compliance_value = round(vol_max_I_P / delta_presion, 1) if delta_presion > 0 else None
         else:
             compliance_value = None
+
         # Resistencia inspiratoria (Res_I cmH2O/l/s)
-        if row["Flujo_max_I (lpm)"] is not None and row["Flujo_max_I (lpm)"] > 0:
-            res_I_value = round(((row["Pres_max_I (cmH2O)"] - row["Pres_Plato (cmH2O)"]) * 60) / row["Flujo_max_I (lpm)"], 1)
+        pres_max_I = row["Pres_max_I (cmH2O)"]
+        flujo_max_I = row["Flujo_max_I (lpm)"]
+
+        if pres_max_I is not None and pres_plato is not None and flujo_max_I is not None and flujo_max_I > 0:
+            res_I_value = round(((pres_max_I - pres_plato) * 60) / flujo_max_I, 1)
         else:
             res_I_value = None
+
         # Ventilación Minuto (VM ml)
-        if row["Frecuencia (BPM)"] is not None:
-            vm_value = round((row["Frecuencia (BPM)"] * row["Vol_max_I_P (ml)"]) / 1000, 1)
+        frecuencia = row["Frecuencia (BPM)"]
+
+        if frecuencia is not None and vol_max_I_P is not None:
+            vm_value = round((frecuencia * vol_max_I_P) / 1000, 1)
         else:
             vm_value = None
+
         # Agregar a las listas
         compliance.append(compliance_value)
         res_I.append(res_I_value)
         vm.append(vm_value)
+
     # Agregar nuevas columnas al DataFrame de resultados
     df["Compliance (ml/cmH2O)"] = compliance
     df["Res_I (cmH2O/l/s)"] = res_I
