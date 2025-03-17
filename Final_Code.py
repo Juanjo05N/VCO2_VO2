@@ -1,5 +1,4 @@
 import pandas as pd, os, numpy as np, matplotlib.pyplot as plt, tkinter as tk, pathlib as Path; from scipy import integrate
-
 ## Funciones generales
 def menu():
     print("\n🔹 Menú de Procesos 🔹")
@@ -8,15 +7,6 @@ def menu():
     print("3. PROCESO AUTOMATICO GENERACION SUBGRUPOS")
     print("4. PROCESO AUTOMATICO ANALISIS FINAL")
     print("0 - EXIT")
-def limpiar_terminal():
-    respuesta = input("¿Deseas limpiar la terminal? (S para sí, N para no): ").strip().upper()
-    if respuesta == "S":
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print("✅ Terminal limpiada.")
-    elif respuesta == "N":
-        print("❌ No se ha limpiado la terminal.")
-    else:
-        print("⚠️ Entrada inválida. Ingresa 'S' o 'N'.")
 def continuar_proceso():
     while True:
         respuesta = input("¿Deseas continuar? (S para sí, N para no): ").strip().upper()
@@ -29,7 +19,6 @@ def continuar_proceso():
             print("⚠️ Entrada inválida. Ingresa 'S' para sí o 'N' para no.")
 def leer_excel_con_ruta(ruta):
     return pd.read_excel(ruta)
-
 ## Procesamiento inicial
 # A.PROCEDIMIENTO INICAL PARA DETERMINACION DE CICLOS Y FASES DE CADA CICLO RESPIRATORIO
 def procesar_dataframe(df):
@@ -533,6 +522,7 @@ def VO2_CO2_Real(df):
     
     df = df[column_order]
     return df
+'''
 def VO2_Y(df):
     df = df.copy()
     # Crear la columna flujo_o2 que es flujo * (o2/100) pero como el flujo esta en l/min y se necesita en ml/ms, se hace la conversión
@@ -551,6 +541,59 @@ def VO2_Y(df):
             print(f"Advertencia: El ciclo {ciclo} no tiene datos asociados.")
 
     return df
+'''
+def VO2_Y(df):
+    df = df.copy()
+    df['flujo_o2'] = df['flujo'] * ((1000/1)*(1/60)*(1/1000)) * (df['o2'] / 100)
+    df['VO2_ciclo (ml) ALT2'] = np.nan
+    ciclos_unicos = df['ciclo'].unique()
+    
+    for ciclo in ciclos_unicos:
+        datos_ciclo = df[df['ciclo'] == ciclo]
+        if len(datos_ciclo) > 0:
+            x = datos_ciclo['t'].values
+            y = datos_ciclo['flujo_o2'].values
+            
+            # Integral total
+            vo2_ciclo = abs(integrate.trapezoid(y, x))
+
+            # Identificar último positivo antes de tres negativos seguidos
+            flujo = datos_ciclo['flujo'].values
+            indices_corte = np.where((flujo[:-2] < 0) & (flujo[1:-1] < 0) & (flujo[2:] < 0))[0]
+            corte = indices_corte[0] if len(indices_corte) > 0 else len(flujo)
+            flujo_pos = datos_ciclo.iloc[:corte]
+            flujo_pos = flujo_pos[flujo_pos['flujo'] > 0]
+            flujo_neg = datos_ciclo.iloc[corte:]
+            flujo_neg = flujo_neg[flujo_neg['flujo'] < 0]
+
+            VO2_INS = integrate.trapezoid(flujo_pos['flujo'] * ((1000/1)*(1/60)*(1/1000)) * (datos_ciclo['o2'].mean() / 100), flujo_pos['t']) if not flujo_pos.empty else 0
+            VO2_ES  = integrate.trapezoid(flujo_neg['flujo'] * ((1000/1)*(1/60)*(1/1000)) * (datos_ciclo['o2'].mean() / 100), flujo_neg['t']) if not flujo_neg.empty else 0
+
+            # Aplicar corrección
+            correccion = abs(VO2_INS) - abs(VO2_ES)
+            #print(f" El vo2 ciclo sin corrección es: {vo2_ciclo}")
+            if correccion > 0:
+                vo2_ciclo -= correccion
+            #print(f"Ciclo: {ciclo}")
+            #print(f"El Vo2 ins es: {VO2_INS}")
+            #print(f"El Vo2 es es: {VO2_ES}")
+            #print(f" El vo2 ciclo corregido es: {vo2_ciclo}")
+            #print(f" La corrección es:{correccion}")
+            #print(f"El flujo de o2 del datos_ciclo es:")
+            #print(datos_ciclo[['o2','flujo','flujo_o2','t']])
+            #print(f"El flujo positivo es:")
+            #print(flujo_pos[['o2','flujo','flujo_o2','t']]),
+            #print(f"El flujo negativo es:")
+            #print(flujo_neg[['o2','flujo','flujo_o2','t']])
+            #print(f"el promedio de o2 es {datos_ciclo['o2'].mean()}")
+            primer_indice_ciclo = datos_ciclo.index[0]
+            df.at[primer_indice_ciclo, 'VO2_ciclo (ml) ALT2'] = vo2_ciclo
+            #breakpoint()
+        else:
+            print(f"Advertencia: El ciclo {ciclo} no tiene datos asociados.")
+    
+    return df
+'''
 def VCO2_Y(df):
     df = df.copy()
     # Crear la columna flujo_o2 que es flujo * (o2/100) pero como el flujo esta en l/min y se necesita en ml/ms, se hace la conversión
@@ -564,11 +607,61 @@ def VCO2_Y(df):
             y = datos_ciclo['flujo_co2'].values
             vco2_ciclo = integrate.trapezoid(y, x)
             primer_indice_ciclo = datos_ciclo.index[0]
-            df.at[primer_indice_ciclo, 'VCO2_ciclo (ml) ALT2'] = -vco2_ciclo
+            df.at[primer_indice_ciclo, 'VCO2_ciclo (ml) ALT2'] = vco2_ciclo #REVISAR ESTO!!!!
         else:
             print(f"Advertencia: El ciclo {ciclo} no tiene datos asociados.")
     return df
+'''
+def VCO2_Y(df):
+    df = df.copy()
+    df['flujo_co2'] = df['flujo'] * ((1000/1)*(1/60)*(1/1000)) * (df['co2'] / 100)
+    df['VCO2_ciclo (ml) ALT2'] = np.nan
+    ciclos_unicos = df['ciclo'].unique()
 
+    for ciclo in ciclos_unicos:
+        datos_ciclo = df[df['ciclo'] == ciclo]
+        if len(datos_ciclo) > 0:
+            x = datos_ciclo['t'].values
+            y = datos_ciclo['flujo_co2'].values
+
+            # Integral total
+            vco2_ciclo = abs(integrate.trapezoid(y, x))
+
+            # Identificar último positivo antes de tres negativos seguidos
+            flujo = datos_ciclo['flujo'].values
+            indices_corte = np.where((flujo[:-2] < 0) & (flujo[1:-1] < 0) & (flujo[2:] < 0))[0]
+            corte = indices_corte[0] if len(indices_corte) > 0 else len(flujo)
+            flujo_pos = datos_ciclo.iloc[:corte]
+            flujo_pos = flujo_pos[flujo_pos['flujo'] > 0]
+            flujo_neg = datos_ciclo.iloc[corte:]
+            flujo_neg = flujo_neg[flujo_neg['flujo'] < 0]
+
+            VCO2_INS = integrate.trapezoid(flujo_pos['flujo'] * ((1000/1)*(1/60)*(1/1000)) * (datos_ciclo['co2'].mean() / 100), flujo_pos['t']) if not flujo_pos.empty else 0
+            VCO2_ES = integrate.trapezoid(flujo_neg['flujo'] * ((1000/1)*(1/60)*(1/1000)) * (datos_ciclo['co2'].mean() / 100), flujo_neg['t']) if not flujo_neg.empty else 0
+
+            # Aplicar corrección
+            #print(f" El vco2 ciclo sin corrección es: {vco2_ciclo}")
+            correccion = abs(VCO2_INS) - abs(VCO2_ES)
+            if correccion > 0:
+                vco2_ciclo += correccion
+            #print(f"Ciclo: {ciclo}")
+            #print(f"El Vco2 ins es: {VCO2_INS}")
+            #print(f"El Vco2 es es: {VCO2_ES}")
+            #print(f" El vco2 ciclo corregido es: {vco2_ciclo}")
+            #print(f" La corrección es:{correccion}")
+            #print(f"El flujo de co2 del datos_ciclo es:")
+            #print(datos_ciclo[['co2','flujo','flujo_co2','t']])
+            #print(f"El flujo positivo es:")
+            #print(flujo_pos[['co2','flujo','flujo_co2','t']])
+            #print(f"El flujo negativo es:")
+            #print(flujo_neg[['co2','flujo','flujo_co2','t']])
+            #print(f"el promedio de co2 es {datos_ciclo['co2'].mean()}")
+            primer_indice_ciclo = datos_ciclo.index[0]
+            df.at[primer_indice_ciclo, 'VCO2_ciclo (ml) ALT2'] = vco2_ciclo
+            #breakpoint()
+        else:
+            print(f"Advertencia: El ciclo {ciclo} no tiene datos asociados.")
+    return df
 # E. FUSION DE LOS DATOS DE LA OXIMETRÍA: Está en proceso automatico 2
 # F. PROCEDIMIENTO PARA ANÁLISIS FINAL DE CADA UNO DE LOS SUBGRUPOS DE CADA PACIENTE
 def ciclo__tinicio_ttotal_relacionIE(df, ciclos_unicos, df_copy): #P1
@@ -889,10 +982,10 @@ def calculos_final_porcentaje_ascr_tiempototal(df,total_ciclos,df_copy): #P15
     porcentaje_ascr = round((df['Tipo ciclo'].value_counts().get('ASCR', 0) / total_ciclos) * 100, 1)
     # Calcular el tiempo total transcurrido (en minutos)
     tiempo_total_min = round((df_copy['t'].dropna().iloc[-1] - df_copy['t'].dropna().iloc[0]) / (1000 * 60), 2)
-    print(f"Tiempo inicial (ms): {df_copy['t'].dropna().iloc[0]}")
-    print(f"Tiempo final (ms): {df_copy['t'].dropna().iloc[-1]}")
-    print(f"Diferencia (ms): {df_copy['t'].dropna().iloc[-1] - df_copy['t'].dropna().iloc[0]}")
-    print(f"Tiempo total (min): {tiempo_total_min}")
+    #print(f"Tiempo inicial (ms): {df_copy['t'].dropna().iloc[0]}")
+    #print(f"Tiempo final (ms): {df_copy['t'].dropna().iloc[-1]}")
+    #print(f"Diferencia (ms): {df_copy['t'].dropna().iloc[-1] - df_copy['t'].dropna().iloc[0]}")
+    #print(f"Tiempo total (min): {tiempo_total_min}")
     # Crear una nueva fila con todos los valores explícitos
     nueva_fila = {}
     for columna in df.columns:
@@ -1030,8 +1123,8 @@ def calculo_VO2_minuto_VCO2(df, df_copy): #P20
             "t Inicio ciclo (ms)": "N/A"
         }
         # Añadir valores específicos de VO2 y VCO2
-        nueva_fila_vo2_vco2["VO2_ciclo (ml)"] = float(round(vo2_minuto, 2))
-        nueva_fila_vo2_vco2["VCO2_ciclo (ml)"] = float(round(vco2_minuto, 2))
+        nueva_fila_vo2_vco2["VO2_ciclo_correcion_fuga (ml)"] = float(round(vo2_minuto, 2))
+        nueva_fila_vo2_vco2["VCO2_ciclo_correcion_fuga (ml)"] = float(round(vco2_minuto, 2))
         # Llenar las demás columnas con np.nan
         for columna in df.columns:
             if columna not in nueva_fila_vo2_vco2:
@@ -1133,13 +1226,20 @@ def proc_autom_2(num_paciente,num_sets):
             print(f"\nProcessing Set {i} of {num_sets} for Patient {num_paciente}")
             data = pd.read_excel(input_file)
             data = VolE_and_VDana(data)
+            print("P1 completado")
             data = Columnas_para_fase_E(data)
+            print("P2 completado")
             data = det_asincronias(data)
+            print("P3 completado")
             data = VO2_CO2_Real(data)
+            print("P4 completado")
             data = VO2_Y(data)
+            print("P5 completado")
             data = VCO2_Y(data)
+            print("P6 completado")
             columns_to_drop = ['flujo_o2', 'flujo_co2']
             data = data.drop(columns=columns_to_drop)
+            print("P7 completado")
             data.to_excel(output_file, index=False)
             print(f"Successfully processed and saved: {output_file}")
         except Exception as e:
@@ -1338,7 +1438,6 @@ def ejecutar_proceso():
         elif opcion == "0":
             print("\n👋 Saliendo del programa...")
             print("\n👋 Hasta la próxima")
-            limpiar_terminal()
             break  
 # Main
 ejecutar_proceso()
