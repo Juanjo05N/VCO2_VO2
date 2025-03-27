@@ -1,4 +1,4 @@
-import pandas as pd, os, numpy as np, matplotlib.pyplot as plt, tkinter as tk, pathlib as Path; from scipy import integrate
+import pandas as pd, os, numpy as np, matplotlib.pyplot as plt, tkinter as tk, pathlib as Path; from scipy import integrate; import re
 ## Funciones generales
 def menu():
     print("\n🔹 Menú de Procesos 🔹")
@@ -6,6 +6,7 @@ def menu():
     print("2. PROCESO AUTOMATICO INICIAL")
     print("3. PROCESO AUTOMATICO GENERACION SUBGRUPOS")
     print("4. PROCESO AUTOMATICO ANALISIS FINAL")
+    print("5. GRAFICA DE PRESION Y FLUJO")
     print("0 - EXIT")
 def continuar_proceso():
     while True:
@@ -62,38 +63,82 @@ def deltas(df):
     df['delta_Presion'] = df['delta_Presion'].round(2)
 
     # Calcular la diferencia de VOLUMEN entre la fila actual y dos filas siguientes
-    df["delta_Volumen"] = df["volumen"].shift(-2) - df["volumen"]
+    df['delta_Volumen'] = df['volumen'].shift(-2) - df['volumen']
 
     # Redondear la nueva columna a dos cifras decimales
     df['delta_Volumen'] = df['delta_Volumen'].round(2)
+
+    df['delta_flujo'] = df['flujo'] - df['flujo'].shift(1)
     return df
 def fases_ciclos(df):
-    # Crear una copia del dataframe para no modificar el original
     df_copy = df.copy()
-    
-    # Inicializar la columna 'fase' con valores vacíos
     df_copy['fase'] = ''
-    
-    # Obtener lista única de ciclos
+
     ciclos = df_copy['ciclo'].unique()
-    
+
     for ciclo in ciclos:
         mask_ciclo = df_copy['ciclo'] == ciclo
         indices_ciclo = df_copy[mask_ciclo].index
-        inicio_i = indices_ciclo[0]
-        fin_i = indices_ciclo[df_copy.loc[indices_ciclo, 'delta_Presion'] > 4.00].min()
+
+        if len(indices_ciclo) == 0:
+            continue
+
+        # Encontrar el inicio de la fase I (primer flujo > 1)
+        inicio_i = indices_ciclo[df_copy.loc[indices_ciclo, 'flujo'] > 0.1].min()
         
-        if pd.notna(fin_i):
-            df_copy.loc[inicio_i:fin_i, 'fase'] = 'I'
-            inicio_p = fin_i + 1
-            fin_p = indices_ciclo[df_copy.loc[indices_ciclo, 'delta_Volumen'] < -2.00].min()
+        # Determinar el volumen máximo del ciclo
+        volumen_max = df_copy.loc[indices_ciclo, 'volumen'].max()
+        umbral_volumen = volumen_max * 0.5
+
+        # Encontrar el fin de la fase I (flujo < 4 y volumen > 50% del volumen máximo)
+        fin_i = indices_ciclo[(indices_ciclo > inicio_i) &
+                              (df_copy.loc[indices_ciclo, 'flujo'] < 4) &
+                              (df_copy.loc[indices_ciclo, 'volumen'] > umbral_volumen)].min() 
+        
+        if pd.notna(inicio_i) and pd.notna(fin_i):
+            df_copy.loc[inicio_i:fin_i-1, 'fase'] = 'I'
+            
+            # Inicio de la pausa (justo después del fin de la fase I)
+            inicio_p = fin_i
+            
+            # Fin de la pausa (flujo fuera del rango [-4, 4] y delta de presión < 1)
+            fin_p = indices_ciclo[(indices_ciclo > inicio_p) &
+                                  (~df_copy.loc[indices_ciclo, 'flujo'].between(-4, 4)) &
+                                  (df_copy.loc[indices_ciclo, 'delta_Presion'] < 3)].min() #Para el flujo, entonces el rango es de 4 a -4 para la pausa, y verificar mientras el delta de presión es mayor que 1
+            
+            # Si el flujo en fin_p es menor que -10, tomar el valor anterior
+            if pd.notna(fin_p) and df_copy.loc[fin_p, 'flujo'] < -10:
+                fin_p_alternativo = indices_ciclo[(indices_ciclo < fin_p) & (df_copy.loc[indices_ciclo, 'flujo'] < -4)].max()
+                if pd.notna(fin_p_alternativo):
+                    fin_p = fin_p_alternativo
             
             if pd.notna(fin_p):
                 df_copy.loc[inicio_p:fin_p-1, 'fase'] = 'P'
                 
-                # Identificar fase E
-                # Las filas restantes del ciclo
-                df_copy.loc[fin_p:indices_ciclo[-1], 'fase'] = 'E'
+                # Inicio de la fase E (flujo < -4 y delta de presión > 1)
+                inicio_e = indices_ciclo[(indices_ciclo >= fin_p) &
+                                         (df_copy.loc[indices_ciclo, 'flujo'] < -4.00) &
+                                         (df_copy.loc[indices_ciclo, 'delta_Volumen'] < -2.00)].min()
+                
+                # Si no se encuentra inicio_e, tomar el valor justo después de fin_p
+                if pd.isna(inicio_e):
+                    print(f"El ciclo {ciclo} Es nan para el inicio de e, se toma cuando acaba la pausa")
+                    inicio_e = fin_p + 1
+                
+                if pd.notna(inicio_e):
+                    df_copy.loc[inicio_e:indices_ciclo[-1], 'fase'] = 'E'
+                # print(f"Proceso de identificación de fases para el ciclo {ciclo}.")
+                # print(f"Fase I empieza en: {inicio_i} y termina en: {fin_i}")
+                # print(f"Fase P empieza en: {inicio_p} y termina en: {fin_p}")
+                # print(f"Fase E empieza en: {inicio_e} y termina en: {indices_ciclo[-1]}")
+                # print(f"flujo y volumen en inicio de la i {df_copy.loc[inicio_i, 'flujo']} y {df_copy.loc[inicio_i, 'volumen']}")
+                # print(f"flujo y volumen en fin de la i {df_copy.loc[fin_i, 'flujo']} y {df_copy.loc[fin_i, 'volumen']}")
+                # print(f"flujo y volumen en inicio de la p {df_copy.loc[inicio_p, 'flujo']} y {df_copy.loc[inicio_p, 'volumen']}")
+                # print(f"flujo y volumen en fin de la p {df_copy.loc[fin_p, 'flujo']} y {df_copy.loc[fin_p, 'volumen']}")
+                # print(f"flujo y volumen en inicio de la e {df_copy.loc[inicio_e, 'flujo']} y {df_copy.loc[inicio_e, 'volumen']}")
+                # print(f"flujo y volumen en fin de la e {df_copy.loc[indices_ciclo[-1], 'flujo']} y {df_copy.loc[indices_ciclo[-1], 'volumen']}")
+                # breakpoint()
+    
     return df_copy
  #Agregar las lineas para guardar el archivo
 def guardar_ciclos_inicio_fin(df,paciente):
@@ -140,18 +185,19 @@ def grafica(df):
     # Crear la figura y ejes
     fig, ax1 = plt.subplots(figsize=(10, 5))
 
-    # Eje Y izquierdo (Presión, O2, CO2)
+    # Eje Y izquierdo (Presión, O2, CO2, Flujo)
     ax1.set_xlabel("Tiempo (s)")
-    ax1.set_ylabel("Presión (cmH2O) / Concentraciones (%)")
-    ax1.plot(df_filtrado["t"], df_filtrado["presion"], label="Presión", color="orange", linestyle="-",linewidth = 0.6)
-    ax1.plot(df_filtrado["t"], df_filtrado["o2"], label="O2", color="green", linestyle="-",linewidth = 0.6)
-    ax1.plot(df_filtrado["t"], df_filtrado["co2"], label="CO2", color="gray", linestyle=":",linewidth = 0.6)
+    ax1.set_ylabel("Presión (cmH2O) / Concentraciones (%) / Flujo (ml/s)")
+    ax1.plot(df_filtrado["t"], df_filtrado["presion"], label="Presión", color="orange", linestyle="-", linewidth=0.6)
+    ax1.plot(df_filtrado["t"], df_filtrado["o2"], label="O2", color="green", linestyle="-", linewidth=0.6)
+    ax1.plot(df_filtrado["t"], df_filtrado["co2"], label="CO2", color="gray", linestyle=":", linewidth=0.6)
+    ax1.plot(df_filtrado["t"], df_filtrado["flujo"], label="Flujo", color="red", linestyle="--", linewidth=0.6)
     ax1.tick_params(axis='y')
 
     # Crear un segundo eje Y para Volumen
     ax2 = ax1.twinx()
     ax2.set_ylabel("Volumen (ml)")
-    ax2.plot(df_filtrado["t"], df_filtrado["volumen"], label="Volumen", color="blue", linestyle=":",linewidth = 0.6)
+    ax2.plot(df_filtrado["t"], df_filtrado["volumen"], label="Volumen", color="blue", linestyle=":", linewidth=0.6)
     ax2.tick_params(axis='y', colors="blue")
 
     # Agregar leyendas
@@ -159,7 +205,31 @@ def grafica(df):
     ax2.legend(loc="upper right")
 
     # Título y mostrar la gráfica
-    plt.title(f"Evolución de Presión, O2, CO2 y Volumen - Ciclos {ciclo_inicio} al {ciclo_fin}")
+    plt.title(f"Evolución de Presión, O2, CO2, Flujo y Volumen - Ciclos {ciclo_inicio} al {ciclo_fin}")
+    plt.grid(True)
+    plt.show()
+def grafica_comp(df):
+    ciclo_inicio = int(input("Ingrese el ciclo de inicio: "))
+    ciclo_fin = int(input("Ingrese el ciclo de fin: "))
+
+    # Filtrar datos por los ciclos seleccionados
+    df_filtrado = df[(df["ciclo"] >= ciclo_inicio) & (df["ciclo"] < ciclo_fin+1)]
+
+    # Crear la figura y ejes
+    fig, ax1 = plt.subplots(figsize=(10, 5))
+
+    # Eje Y izquierdo (Presión y Flujo)
+    ax1.set_xlabel("Tiempo (s)")
+    ax1.set_ylabel("Presión (cmH2O) / Flujo (ml/s)")
+    ax1.plot(df_filtrado["t"], df_filtrado["presion"], label="Presión", color="orange", linestyle="-", linewidth=0.6)
+    ax1.plot(df_filtrado["t"], df_filtrado["flujo"], label="Flujo", color="red", linestyle="--", linewidth=0.6)
+    ax1.tick_params(axis='y')
+
+    # Agregar leyenda
+    ax1.legend(loc="upper left")
+
+    # Título y mostrar la gráfica
+    plt.title(f"Evolución de Presión y Flujo - Ciclos {ciclo_inicio} al {ciclo_fin}")
     plt.grid(True)
     plt.show()
 def guardar_correcion_retraso(df,paciente):
@@ -177,6 +247,7 @@ def crear_resumen_ciclos(df):
     ciclos = sorted(df['ciclo'].unique())
     for ciclo in ciclos:
         # Filtrar datos del ciclo actual
+        datos_ciclo = 0
         datos_ciclo = df[df['ciclo'] == ciclo]
         
         # Obtener t inicio y t final
@@ -191,7 +262,8 @@ def crear_resumen_ciclos(df):
         
         # Calcular estadísticas
         promedio_o2_I_P = datos_I_P['o2'].mean()
-        promedio_presion_E = datos_E['presion'].mean()
+        promedio_presion_E = datos_ciclo['presion'].iloc[-30:].mean()
+        # print(f"el promedio de la presion es {promedio_presion_E} para el ciclo {ciclo}")
         vol_max_I_P = datos_I_P['volumen'].max()
         t_total_ciclo = t_final - t_inicio
         frecuencia = 60 / (t_total_ciclo / 1000)  # Convertir ms a segundos
@@ -220,53 +292,34 @@ def guardar_promedios_por_ciclos(df,paciente):
     ruta_completa = os.path.join(os.getcwd(), f"Paciente_{paciente}_Promedios_por_Ciclos_PEEP_Vt_F.xlsx")
     print("¡Proceso finalizado! 🎉")
     print(f"✅ Archivo guardado en: {ruta_completa}")
-def dividir_archivo_por_ciclos(df, num_sets, num_paciente): #Divide y guarda los subsets crudos
-    df = df.drop(columns=["delta_Presion", "delta_Volumen"]) # Elimina las dos columnas de delta
-    # Obtener el rango total de ciclos disponibles
-    ciclos_totales = sorted(df['ciclo'].unique())
-    print(f"\nCiclos disponibles: {min(ciclos_totales)} a {max(ciclos_totales)}")
+def dividir_archivo_por_ciclos(df, rangos_ciclos, num_paciente):
+    if "ciclo" not in df.columns:
+        raise ValueError("⚠️ Error: La columna 'ciclo' no se encontró en el DataFrame.")
     
-    # Lista para almacenar los rangos de cada set
-    rangos_sets = []
+    df = df.drop(columns=["delta_Presion", "delta_Volumen"], errors='ignore')  # Elimina columnas si existen
     
-    # Solicitar rangos para cada set
-    for i in range(num_sets):
-        while True:
-            try:
-                print(f"\nDefiniendo Set {i+1} de {num_sets}")
-                ciclo_inicio = int(input(f"Ingrese el ciclo inicial para el set {i+1}: "))
-                ciclo_fin = int(input(f"Ingrese el ciclo final para el set {i+1}: "))
-                
-                # Validar que los ciclos estén en el rango disponible
-                if ciclo_inicio in ciclos_totales and ciclo_fin in ciclos_totales and ciclo_inicio <= ciclo_fin:
-                    rangos_sets.append((ciclo_inicio, ciclo_fin))
-                    break
-                else:
-                    print(f"Error: Los ciclos deben estar entre {min(ciclos_totales)} y {max(ciclos_totales)}")
-            except ValueError:
-                print("Error: Por favor ingrese números enteros válidos.")
-    
-    # Crear directorio para los resultados
-    # Usar el directorio actual
+    # Crear directorios
     directorio_resultados = os.path.join(os.getcwd(), f"Paciente_{num_paciente}")
     os.makedirs(directorio_resultados, exist_ok=True)
     subcarpeta = os.path.join(directorio_resultados, f"Subsets_Crudos_Paciente_{num_paciente}")
     os.makedirs(subcarpeta, exist_ok=True)
     
-    # Crear cada subset
-    for i, (ciclo_inicio, ciclo_fin) in enumerate(rangos_sets, 1):
-        # Filtrar datos para el set actual
+    # Generar subsets
+    for i, (ciclo_inicio, ciclo_fin) in enumerate(rangos_ciclos, 1):
         subset = df[df['ciclo'].between(ciclo_inicio, ciclo_fin)].copy()
         
-        # Guardar el subset
-        nombre_archivo = os.path.join(subcarpeta, f"paciente_{num_paciente}_set_{i}_de_{num_sets}.xlsx")
+        if subset.empty:
+            print(f"⚠️ Advertencia: El rango {ciclo_inicio}-{ciclo_fin} no tiene datos en 'ciclo'.")
+            continue
+        
+        nombre_archivo = os.path.join(subcarpeta, f"paciente_{num_paciente}_set_{i}_de_{len(rangos_ciclos)}.xlsx")
         subset.to_excel(nombre_archivo, index=False)
         
         print(f"\nSet {i} guardado:")
         print(f"- Ciclos: {ciclo_inicio} a {ciclo_fin}")
         print(f"- Archivo guardado como: {nombre_archivo}")
         print(f"- Número de ciclos en el set: {len(subset['ciclo'].unique())}")
-        print(f"- Número de filas en el set: {len(subset)}") 
+        print(f"- Número de filas en el set: {len(subset)}")
 # D. PROCEDIMIENTO PARA DETERMINAR ESPACIO MUERTO Y CICLOS ASINCRÓNICOS
 def VolE_and_VDana(df):
     # Crear columna para el volumen espiratorio corregido (Vol_E)
@@ -671,7 +724,7 @@ def frecuencia_pres_media(df,ciclos_unicos,df_copy): #P2
         presion_max_I = ciclo_df[ciclo_df['fase'] == 'I']['presion'].max()
         presion_max_I = round(presion_max_I, 1) if pd.notnull(presion_max_I) else None
         # Obtener presión media en fase E
-        presion_media_E = ciclo_df[ciclo_df['fase'] == 'E']['presion'].mean()
+        presion_media_E = ciclo_df['presion'].iloc[-30:].mean()
         presion_media_E = round(presion_media_E, 1) if pd.notnull(presion_media_E) else None
         # Agregar a las listas
         frecuencia_bpm.append(frecuencia)
@@ -1171,18 +1224,53 @@ def proc_autom_1():
     df = crear_resumen_ciclos(df)
     guardar_promedios_por_ciclos(df,paciente)
 def proc_subsets():
-    print("\n✅ Dividiendo los datos en subsets")
-    num_sets = int(input("Ingrese el número total de sets a crear: "))
     num_paciente = int(input("Ingrese el número del paciente: "))
-
+    
     print("Ejecutando la importación de los datos...")
     directorio_base = os.path.join(os.getcwd(), f"Paciente_{num_paciente}")
     ruta_df = os.path.join(directorio_base, f"Paciente_{num_paciente}_correcion_retraso.xlsx")
-    dividir_archivo_por_ciclos()
-    # Cargar los datos de la oximetría una sola vez
+    ruta_tabla1 = os.path.join(directorio_base, "Docs")
+    ruta_tabla = os.path.join(ruta_tabla1, f"Tabla_Subgrupos_Paciente_{num_paciente}.xlsx")
+
+    # Cargar los datos
     print("\nCargando los datos ... ")
-    df = leer_excel_con_ruta(ruta_df)
-    dividir_archivo_por_ciclos(df,num_sets,num_paciente)
+    tabla = pd.read_excel(ruta_tabla, skiprows=2)
+
+    
+    if "CICLOS" not in tabla.columns:
+        raise ValueError("⚠️ Error: La columna 'CICLOS' no se encontró en la tabla.")
+
+    df = pd.read_excel(ruta_df)
+
+    # Procesar la columna de ciclos
+    ciclos_texto = tabla["CICLOS"].dropna().astype(str).str.strip()
+
+    # Separar los valores en inicio y fin
+    rangos_ciclos = []
+    for ciclo in ciclos_texto:
+        try:
+            partes = ciclo.split(" a ")
+            if len(partes) != 2:
+                print(f"⚠️ Advertencia: Formato incorrecto en '{ciclo}', se ignora.")
+                continue
+
+            # Eliminar caracteres no numéricos antes de convertir a entero
+            inicio = "".join(filter(str.isdigit, partes[0]))
+            fin = "".join(filter(str.isdigit, partes[1]))
+
+            if inicio and fin:
+                rangos_ciclos.append((int(inicio), int(fin)))
+            else:
+                print(f"⚠️ Advertencia: No se pudieron extraer números de '{ciclo}', se ignora.")
+        
+        except ValueError:
+            print(f"⚠️ Advertencia: No se pudo procesar el valor '{ciclo}', se ignora.")
+
+    # Verificar si hay rangos válidos antes de continuar
+    if not rangos_ciclos:
+        raise ValueError("⚠️ Error: No se encontraron rangos de ciclos válidos en la tabla.")
+
+    dividir_archivo_por_ciclos(df, rangos_ciclos, num_paciente)
     print("\nProceso completado. ✅")
 def proc_autom_2(num_paciente,num_sets):
     # Base directory path - convert numbers to strings
@@ -1359,7 +1447,7 @@ def ejecutar_proceso():
         opcion = input("Ingrese un número para elegir el proceso: ").strip()
         if opcion == "1":
             try: 
-                print("\n✅ Ejecutando Proceso 9, Graficando...")
+                print("\n✅ Ejecutando Proceso 1, Graficando...")
                 paciente = input("\n Ingrese el numero del paciente: ")
                 print("\nEjecutando la importación de los datos...")
                 directorio_base = os.path.join(os.getcwd(), f"Paciente_{paciente}")
@@ -1367,14 +1455,13 @@ def ejecutar_proceso():
                 df = leer_excel_con_ruta(ruta_datos_crudos)
                 while continuar_proceso():
                     grafica(df)
-                    if not continuar_proceso():
-                        print("\n✅ Proceso detenido.")
+                print("Proceso detenido. ✅")
             except Exception as e:
                 print(f"Ocurrió un error: {e}")
                 print("Proceso detenido. ✅")
         elif opcion == "2":
             try:
-                print("\n✅ Ejecutando Proceso automatico 1.")
+                print("\n✅ Ejecutando Proceso automatico 2.")
                 proc_autom_1()
             except Exception as e:
                 print(f"Ocurrió un error: {e}")
@@ -1383,16 +1470,7 @@ def ejecutar_proceso():
         elif opcion == "3":
             try: 
                 print("\n✅ Dividiendo los datos en subsets")
-                num_sets = int(input("Ingrese el número total de sets a crear: "))
-                num_paciente = int(input("Ingrese el número del paciente: "))
-                print("Ejecutando la importación de los datos...")
-                directorio_base = os.path.join(os.getcwd(), f"Paciente_{num_paciente}")
-                ruta_df = os.path.join(directorio_base, f"Paciente_{num_paciente}_correcion_retraso.xlsx")
-                # Cargar los datos de la oximetría una sola vez
-                print("\nCargando los datos ... ")
-                df = leer_excel_con_ruta(ruta_df)
-                dividir_archivo_por_ciclos(df, num_sets, num_paciente)
-                print("\nProceso completado. ✅")
+                proc_subsets()
             except Exception as e:
                 print(f"Ocurrió un error: {e}")
                 print("Proceso detenido. ✅")
@@ -1409,6 +1487,20 @@ def ejecutar_proceso():
                 print(f"Ocurrió un error: {e}")
                 print("Proceso detenido. ✅")
                 break
+        elif opcion == "5":
+            try:
+                print("\n✅ Ejecutando Proceso 5, Graficando...")
+                paciente = input("\n Ingrese el numero del paciente: ")
+                print("\nEjecutando la importación de los datos...")
+                directorio_base = os.path.join(os.getcwd(), f"Paciente_{paciente}")
+                ruta_datos_crudos = os.path.join(directorio_base, f"Paciente_{paciente}_correcion_retraso.xlsx")
+                df = leer_excel_con_ruta(ruta_datos_crudos)
+                while continuar_proceso():
+                    grafica_comp(df)
+                print("Proceso detenido. ✅")
+            except Exception as e:
+                print(f"Ocurrió un error: {e}")
+                print("Proceso detenido. ✅")
         elif opcion == "0":
             print("\n👋 Saliendo del programa...")
             print("\n👋 Hasta la próxima")
