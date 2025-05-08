@@ -31,6 +31,26 @@ pip install pandas numpy matplotlib scipy openpyxl
 python Final_Code.py
 ```
 3. 🖥️ Sigue las instrucciones en la terminal para seleccionar el proceso deseado.
+De forma mas detallada:
+1. Ejecuta el codigo con la carpeta llamada Paciente_i en la misma carpeta del script
+2. Ejecuta el script
+3. En consola, ejecutar la opción 2, teniendo en cuenta que se necesita el fast_decoded y el spo2
+4. Revisar cual es el retraso de O2 y CO2 para el paciente
+5. Realizar la tabla de subgrupos con el archivo final que se crea en el proceso 2.
+6. Dividir el paciente en subsets con el proceso 3
+7. Procesar el paciente finalmente, ejecutar el proceso 4
+8. Generar hoja de resumen con los datos del paciente procesados finales.
+
+A continuación se explica de manera detallada los archivos usados y generados por el codigo y de forma manual
+- fast_decoded y spo2_decoded: Archivos fuentes que nos pasa Mateo.
+- Paciente_1_proceso_ciclos y fases_ciclo inicio(1)_ciclo final(2358): Contiene el procesamiento inicial que separa los datos por ciclos.
+- Paciente_1_correcion_retraso: Contiene los datos con el retraso de O2 y CO2 realizado según cada paciente.
+- Paciente_1_Promedios_por_Ciclos_PEEP_Vt_F: Contiene el resumen de cada ciclo para identificar los cambios de variables y poder dividir el archivo en subsets.
+- Subsets_Crudos_Paciente_1: Contiene los datos retrasados sin procesamiento adicional PERO dividido por subsets.
+- Subsets_Sin_Oximetria_Paciente_1: Contiene los datos de cada subset donde se hacen los cálculos del Vol_E, VDana, Columnas para fase espiratoria, detección de asincronías, VO2 y CO2 real, VO2 y VCO2 calculado por la integral del flujo.
+- Subsets_Con_Oximetria_Paciente_1: Se le agrega a los datos procesados anteriormente los datos de oximetría.
+- Subsets_Procesados_Finales_Paciente_1: Contiene el archivo de cada subset con los cálculos finales y el resumen en las ultimas filas del archivo
+- Docs: Contiene la presentación de Power Point, el resumen del paciente 1 y la tabla de subgrupos.
 
 ## 🏗️ Estructura del Código
 - ⚙️ **Procesamiento inicial**: Limpieza y estructuración de los datos.
