@@ -43,7 +43,7 @@ De forma mas detallada:
 7. Procesar el paciente finalmente, ejecutar el proceso 4
 8. Generar hoja de resumen con los datos del paciente procesados finales.
 
-A continuación se explica de manera detallada los archivos usados y generados por el codigo y de forma manual. Se encuentran en la carpeta comprimida "Paciente 7"
+A continuación se explica de manera detallada los archivos usados y generados por el codigo y de forma manual. Se encuentran en la carpeta comprimida Paciente 7 en este link: https://drive.google.com/file/d/181usf18MWmUuYCEKzctTaDw9j9Grw59C/view?usp=drive_link
 - fast_decoded y spo2_decoded: Archivos fuentes que nos pasa Mateo.
 - Paciente_1_proceso_ciclos y fases_ciclo inicio(1)_ciclo final(2358): Contiene el procesamiento inicial que separa los datos por ciclos.
 - Paciente_1_correcion_retraso: Contiene los datos con el retraso de O2 y CO2 realizado según cada paciente.
