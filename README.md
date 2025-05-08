@@ -31,7 +31,9 @@ pip install pandas numpy matplotlib scipy openpyxl
 python Final_Code.py
 ```
 3. 🖥️ Sigue las instrucciones en la terminal para seleccionar el proceso deseado.
+   
 De forma mas detallada:
+
 1. Ejecuta el codigo con la carpeta llamada Paciente_i en la misma carpeta del script
 2. Ejecuta el script
 3. En consola, ejecutar la opción 2, teniendo en cuenta que se necesita el fast_decoded y el spo2
