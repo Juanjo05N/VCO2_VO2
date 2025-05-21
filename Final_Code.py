@@ -156,7 +156,8 @@ def guardar_ciclos_inicio_fin(df,paciente):
 # B.PROCESO DE SINCRONIZACION Y AJUSTE DE ARCHIVOS
 #Ojo con el automatico 1, recordar ponerle el imput a los retrasos
 def retrasoO2(df, retraso):
-    columnas_principales = ['t', 'presion', 'flujo', 'volumen', 'ciclo', 'delta_presion', 'delta_volumen', 'fase']
+    #columnas_principales = ['t', 'presion', 'flujo', 'volumen', 'ciclo', 'delta_presion', 'delta_volumen', 'fase'] # para retrasar los gases
+    columnas_principales = ['o2', 'co2'] # para adelantar los gases
     retraso = int(float(retraso)/10)
      # Aplicar retraso principal
     for col in columnas_principales:
@@ -1210,8 +1211,8 @@ def proc_autom_1():
     guardar_ciclos_inicio_fin(df,paciente)
 
     print("\nEjecutando retraso de los datos")
-    retrasoO = input("Ingrese el retraso del O2 en milisegundos: ").strip()
-    retrasoCO = input("Ingrese el retraso del CO2 en milisegundos: ").strip()
+    retrasoO = input("Ingrese el adelanto del O2 en milisegundos: ").strip()
+    retrasoCO = input("Ingrese el adelanto del CO2 en milisegundos: ").strip()
     df = retrasoO2(df,retrasoO)
     df = retrasoCO2(df,retrasoCO)
     df = eliminar_filas(df,retrasoO,retrasoCO)
